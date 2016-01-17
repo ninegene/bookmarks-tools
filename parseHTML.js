@@ -1,52 +1,20 @@
-#!/usr/bin/env node
-
 var cheerio = require('cheerio');
-var fs = require('fs');
-var path = require('path');
 
-// https://nodejs.org/docs/latest/api/process.html#process_process_argv
-const PROCESS_ARGS = process.argv.slice(0);
-const ARGS = PROCESS_ARGS.slice(2);
-const PROGPATH = PROCESS_ARGS[1];
-const PROGFILE = path.basename(PROGPATH);
-const PROGDIR = path.dirname(PROGPATH);
-
-function usage() {
-    console.log('Usage: ' + PROGFILE + ' <INPUT HTML FILE> [OUTPUT JSON FILE]');
-}
-
-function parseArgs() {
-  if (ARGS.length == 0 && !ARGS[0]) {
-    usage();
-    process.exit(1);
-  }
-}
-
-function main() {
-    parseArgs();
-    extract(ARGS[0], ARGS[1], {pretty: true});
-}
-
-function extract(inputFile, outputFile, options) {
-  options = options || {};
-  options.pretty = !!options.pretty;
-
-  fs.readFile(inputFile, 'utf-8', function read(err, data) {
-    if (err) {
-      throw err;
-    }
-
+function parseHTML(data) {
     data = addClosingTags(data);
-    var list = extractData(data);
 
-    var str = options.pretty ? JSON.stringify(list, undefined, 2) : JSON.stringify(list);
-    if (outputFile) {
-      fs.writeFile(outputFile, str, 'utf-8');
-      console.log("Finish writing to " + outputFile);
-    } else {
-      console.log(str);
-    }
-  });
+    var $ = cheerio.load(data);
+    var $node = $('a');
+
+    var list = [];
+
+    $node.each(function(index, a) {
+      var $a = $(a);
+      var item = extractItem($a);
+      list.push(item);
+    });
+
+    return list
 }
 
 function addClosingTags(data) {
@@ -62,26 +30,6 @@ function addClosingTags(data) {
       }
     }
     return lines.join('\n');
-}
-
-function extractData(data) {
-    var $ = cheerio.load(data);
-    var $node = $('a');
-
-    if ($node.length == 0) {
-       console.log("No data to extract!")
-       process.exit(0);
-    }
-
-    var list = [];
-
-    $node.each(function(index, a) {
-      var $a = $(a);
-      var item = extractItem($a);
-      list.push(item);
-    });
-
-    return list
 }
 
 function extractItem($a) {
@@ -159,4 +107,4 @@ function isValidUrl(url) {
   return /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})).?)(?::\d{2,5})?(?:[/?#]\S*)?$/i.test(url);
 }
 
-main();
+module.exports = parseHTML;
