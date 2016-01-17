@@ -36,6 +36,7 @@ function extract(inputFile, outputFile, options) {
       throw err;
     }
 
+    data = addClosingTags(data);
     var list = extractData(data);
 
     var str = options.pretty ? JSON.stringify(list, undefined, 2) : JSON.stringify(list);
@@ -46,6 +47,21 @@ function extract(inputFile, outputFile, options) {
       console.log(str);
     }
   });
+}
+
+function addClosingTags(data) {
+    var lines = data.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      // Starts with <DT and ends with </A>
+      if (/^\s*\<DT.+\<\/A\>\s*$/i.test(lines[i])) {
+        lines[i] = lines[i] + '</DT>';
+      }
+      // Starts with <DD and doesn't ends with </DD>
+      else if (/^\s*<DD.+((?!\<\/DD\>).)*$/i.test(lines[i])) {
+        lines[i] = lines[i] + '</DD>';
+      }
+    }
+    return lines.join('\n');
 }
 
 function extractData(data) {
@@ -73,15 +89,20 @@ function extractItem($a) {
   var href = $a.attr('href');
   var icon = $a.attr('icon');
   var domain = extractDomain(href);
+  var attribs = $a.length > 0 ? $a[0].attribs : {};
   var folders = getFolders($a);
+
+  var $dd = $a.closest('DT').next('DD')
+  var note = $dd.text();
 
   var item = {
     title: title,
+    note: note,
     href: href,
     valid_url: isValidUrl(href),
     domain: domain,
     icon: icon,
-    attribs: $a.length > 0 ? $a[0].attribs : {},
+    attribs: attribs,
     folders: folders,
   };
 
@@ -93,14 +114,21 @@ function extractItem($a) {
 
 function getFolders($a) {
   var $node = $a.closest('DL').prev();
-  var htmlTag = $node.length > 0 ? $node[0].name : '';
-  var folder = {
-    title: $node.text(),
-    attribs: $node.length > 0 ? $node[0].attribs : {},
+  if ($node.length == 0) {
+    $node = $a.closest('ul').prev();
   }
 
-  // Ignore folder with no title and root folder with h1 tag.
-  if ($node.length > 0 && folder.title.length > 0 && htmlTag.toLowerCase() != 'h1') {
+  var title = $node.text();
+  var htmlTag = $node.length > 0 ? $node[0].name : '';
+  var attribs = $node.length > 0 ? $node[0].attribs : {};
+
+  var folder = {
+    title: title,
+    attribs: attribs,
+  }
+
+  // Ignore folder with no title
+  if ($node.length > 0 && folder.title.length > 0) {
     return [folder].concat(getFolders($node));
   } else {
     return [];
